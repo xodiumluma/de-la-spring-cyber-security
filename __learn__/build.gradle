@@ -1,0 +1,19 @@
+import io.spring.gradle.IncludeRepoTask
+import trang.RncToXsd
+
+buildscript {
+  dependencies {
+    classpath libs.io.spring.javaformat.spring.javaformat.gradle.plugin
+    classpath libs.io.spring.nohttp.nohttp.gradle
+    classpath libs.io.freefair.gradle.aspectj.plugin
+    classpath libs.org.jetbrains.kotlin.kotlin.gradle.plugin
+    classpath libs.com.netflix.nebula.nebula.project.plugin
+  }
+  repositories {
+    maven { url 'https://plugins.gradle.org/m2/' }
+  }
+}
+
+plugins {
+  alias(libs.plugins.org.gradle.wrapper.upgrade)
+}
