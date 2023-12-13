@@ -23,3 +23,12 @@ apply plugin: 'locks'
 apply plugin: 's101'
 // apply plugin: 'io.spring.convention.root' // commenting out as this is reserved for the root project, not a "subproject" as __learn__ is
 apply plugin: 'org.jetbrains.kotlin.jvm'
+apply plugin: 'org.springframework.security.update-version'
+apply plugin: 'org.springframework.security.sagan'
+apply plugin: 'org.springframework.github.milestone'
+// apply plugin: 'org.springframework.github.changelog' // need to make sure that changelogs are formatted properly otherwise this will break on account of checkstyleNoHttp
+apply plugin: 'org.springframework.github.release'
+apply plugin: 'org.springframework.security.versions.verify-dependencies-versions'
+
+group = 'org.springframework.security'
+description = 'XodiumLuma Spring Security version hahaha'
