@@ -32,3 +32,13 @@ apply plugin: 'org.springframework.security.versions.verify-dependencies-version
 
 group = 'org.springframework.security'
 description = 'XodiumLuma Spring Security version hahaha'
+
+repositories {
+  mavenCentral()
+  maven { url "https://repo.spring.io/milestone" }
+}
+
+tasks.named("saganCreateRelease") {
+  referenceDocUrl = "https://docs.spring.io/spring-security/reference/{version}/index.html"
+  apiDocUrl = "https://docs.spring.io/spring-security/site/docs/{version}/api/"
+}
