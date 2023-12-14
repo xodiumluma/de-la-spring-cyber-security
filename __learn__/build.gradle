@@ -63,3 +63,33 @@ tasks.named("gitHubCheckNextVersionDueToday") {
     name = "spring-security"
   }
 }
+
+tasks.named("scheduleNextRelease") {
+  repository {
+    owner = "spring-projects"
+    name = "spring-security"
+  }
+  weekOfMonth = 3
+  dayOfWeek = 1
+}
+
+tasks.named("createGitHubRelease") {
+  repository {
+    owner = "spring-projects"
+    name = "spring-security"
+  }
+}
+
+tasks.named("dispatchGitHubWorkflow") {
+  repository {
+    owner = "spring-projects"
+    name = "spring-security"
+  }
+}
+
+def toolchainVersion() {
+  if (project.hasProperty('testToolchain')) {
+    return project.property('testToolchain').toString().toInteger()
+  }
+  return 17
+}
