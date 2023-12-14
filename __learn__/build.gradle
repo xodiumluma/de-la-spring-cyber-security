@@ -93,3 +93,16 @@ def toolchainVersion() {
   }
   return 17
 }
+
+subprojects {
+  java {
+    toolchain {
+      languageVersion = JavaLanguageVersion.of(toolChainVersion())
+    }
+    kotlin {
+      jvmToolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+      }
+    }
+  }
+}
