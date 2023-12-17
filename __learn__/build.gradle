@@ -32,3 +32,116 @@ apply plugin: 'org.springframework.security.versions.verify-dependencies-version
 
 group = 'org.springframework.security'
 description = 'XodiumLuma Spring Security version hahaha'
+
+repositories {
+  mavenCentral()
+  maven { url "https://repo.spring.io/milestone" }
+}
+
+tasks.named("saganCreateRelease") {
+  referenceDocUrl = "https://docs.spring.io/spring-security/reference/{version}/index.html"
+  apiDocUrl = "https://docs.spring.io/spring-security/site/docs/{version}/api/"
+}
+
+tasks.named("gitHubCheckMilestoneHasNoOpenIssues") {
+  repository {
+    owner = "spring-projects"
+    name = "spring-security"
+  }
+}
+
+tasks.named("gitHubNextReleaseMilestone") {
+  repository {
+    owner = "spring-projects"
+    name = "spring-security"
+  }
+}
+
+tasks.named("gitHubCheckNextVersionDueToday") {
+  repository {
+    owner = "spring-projects"
+    name = "spring-security"
+  }
+}
+
+tasks.named("scheduleNextRelease") {
+  repository {
+    owner = "spring-projects"
+    name = "spring-security"
+  }
+  weekOfMonth = 3
+  dayOfWeek = 1
+}
+
+tasks.named("createGitHubRelease") {
+  repository {
+    owner = "spring-projects"
+    name = "spring-security"
+  }
+}
+
+tasks.named("dispatchGitHubWorkflow") {
+  repository {
+    owner = "spring-projects"
+    name = "spring-security"
+  }
+}
+
+def toolchainVersion() {
+  if (project.hasProperty('testToolchain')) {
+    return project.property('testToolchain').toString().toInteger()
+  }
+  return 17
+}
+
+subprojects {
+  java {
+    toolchain {
+      languageVersion = JavaLanguageVersion.of(toolChainVersion())
+    }
+    kotlin {
+      jvmToolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+      }
+    }
+    tasks.withType(JavaCompile).configureEach {
+      options.encoding = "UTF-8"
+      options.compilerArgs.add("-parameters")
+      options.release.set(17)
+    }
+  }
+}
+
+allprojects {
+  if (!['spring-security-bom','spring-security-docs'].contains(project.name)) {
+    apply plugin: 'io.spring.javaformat'
+    apply plugin: 'checkstyle'
+
+    pluginManager.withPlugin("io.spring.convention.checkstyle", { plugin ->
+      configure(plugin) {
+        dependencies {
+          checkstyle libs.io.spring.javaformat.spring.javaformat.checkstyle
+        }
+        checkstyle {
+          toolVersion = '8.34'
+        }
+      }
+    })
+
+    if (project.name.contains('sample')) {
+      tasks.whenTaskAdded { task ->
+        if (task.name.contains('format') || task.name.contains('checkFormat') || task.name.contains('checkstyle')) {
+          task.enabled = false
+        }
+      }
+    }
+  }
+}
+
+if (hasProperty('buildScan')) {
+  buildScan {
+    termsOfServiceUrl = 'https://gradle.com/terms-of-service'
+    termsOfServiceAgree = 'yes'
+  }
+}
+
