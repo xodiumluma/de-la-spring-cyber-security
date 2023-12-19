@@ -1,0 +1,8 @@
+Class Mapping from 2.0.x to 3.0.x
+=================================
+
+Roughly mapping classes with new names and/or new versions in 3.0. It's more complicated that what we think. We can start with this list though.
+
+AbstractProcessingFilter, AbstractAuthenticationProcessingFilter
+AbstractFallbackMethodDefinitionSource, AbstractFallbackMethodSecurityMetadataSource
+AnonymousProcessingFilter, AnonymousAuthenticationFilter
