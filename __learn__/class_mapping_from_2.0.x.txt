@@ -6,3 +6,4 @@ Roughly mapping classes with new names and/or new versions in 3.0. It's more com
 AbstractProcessingFilter, AbstractAuthenticationProcessingFilter
 AbstractFallbackMethodDefinitionSource, AbstractFallbackMethodSecurityMetadataSource
 AnonymousProcessingFilter, AnonymousAuthenticationFilter
+AuthenticationFailureConcurrentLoginEvent
