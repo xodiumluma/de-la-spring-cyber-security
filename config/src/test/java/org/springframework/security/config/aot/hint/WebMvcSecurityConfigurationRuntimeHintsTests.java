@@ -14,47 +14,35 @@
  * limitations under the License.
  */
 
-package org.springframework.security.test.aot.hint;
+package org.springframework.security.config.aot.hint;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
+import org.springframework.aot.hint.RuntimeHintsRegistrar;
 import org.springframework.aot.hint.TypeReference;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 import org.springframework.core.io.support.SpringFactoriesLoader;
-import org.springframework.security.web.FilterChainProxy;
-import org.springframework.security.web.context.SecurityContextHolderFilter;
-import org.springframework.security.web.context.SecurityContextPersistenceFilter;
-import org.springframework.security.web.csrf.CsrfFilter;
-import org.springframework.test.context.aot.TestRuntimeHintsRegistrar;
 import org.springframework.util.ClassUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Tests for {@link WebTestUtilsTestRuntimeHints}.
+ * Tests for {@link WebMvcSecurityConfigurationRuntimeHints}
  *
  * @author Marcus da Coregio
  */
-class WebTestUtilsTestRuntimeHintsTests {
+class WebMvcSecurityConfigurationRuntimeHintsTests {
 
 	private final RuntimeHints hints = new RuntimeHints();
 
 	@BeforeEach
 	void setup() {
 		SpringFactoriesLoader.forResourceLocation("META-INF/spring/aot.factories")
-			.load(TestRuntimeHintsRegistrar.class)
-			.forEach((registrar) -> registrar.registerHints(this.hints, WebTestUtilsTestRuntimeHintsTests.class,
-					ClassUtils.getDefaultClassLoader()));
-	}
-
-	@Test
-	void filterChainProxyHasHints() {
-		assertThat(RuntimeHintsPredicates.reflection()
-			.onType(FilterChainProxy.class)
-			.withMemberCategories(MemberCategory.INVOKE_DECLARED_METHODS)).accepts(this.hints);
+			.load(RuntimeHintsRegistrar.class)
+			.forEach((registrar) -> registrar.registerHints(this.hints, ClassUtils.getDefaultClassLoader()));
 	}
 
 	@Test
@@ -62,28 +50,15 @@ class WebTestUtilsTestRuntimeHintsTests {
 		assertThat(RuntimeHintsPredicates.reflection()
 			.onType(TypeReference
 				.of("org.springframework.security.config.annotation.web.configuration.WebMvcSecurityConfiguration$CompositeFilterChainProxy"))
-			.withMemberCategory(MemberCategory.INVOKE_DECLARED_METHODS)).accepts(this.hints);
+			.withMemberCategory(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS)).accepts(this.hints);
 	}
 
 	@Test
-	void csrfFilterHasHints() {
+	void handlerMappingIntrospectorCacheFilterFactoryBeanHasHints() {
 		assertThat(RuntimeHintsPredicates.reflection()
-			.onType(CsrfFilter.class)
-			.withMemberCategories(MemberCategory.DECLARED_FIELDS)).accepts(this.hints);
-	}
-
-	@Test
-	void securityContextPersistenceFilterHasHints() {
-		assertThat(RuntimeHintsPredicates.reflection()
-			.onType(SecurityContextPersistenceFilter.class)
-			.withMemberCategories(MemberCategory.DECLARED_FIELDS)).accepts(this.hints);
-	}
-
-	@Test
-	void securityContextHolderFilterHasHints() {
-		assertThat(RuntimeHintsPredicates.reflection()
-			.onType(SecurityContextHolderFilter.class)
-			.withMemberCategories(MemberCategory.DECLARED_FIELDS)).accepts(this.hints);
+			.onType(TypeReference
+				.of("org.springframework.security.config.annotation.web.configuration.WebMvcSecurityConfiguration$HandlerMappingIntrospectorCacheFilterFactoryBean"))
+			.withMemberCategory(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS)).accepts(this.hints);
 	}
 
 }

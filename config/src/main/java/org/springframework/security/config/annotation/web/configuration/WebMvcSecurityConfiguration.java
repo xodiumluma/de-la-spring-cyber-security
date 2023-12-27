@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,14 +29,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.BeanMetadataElement;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.FactoryBean;
-import org.springframework.beans.factory.aot.BeanRegistrationExcludeFilter;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
 import org.springframework.beans.factory.support.ManagedList;
-import org.springframework.beans.factory.support.RegisteredBean;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.annotation.Bean;
@@ -48,6 +46,7 @@ import org.springframework.security.web.FilterChainProxy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.HandlerMappingIntrospectorRequestTransformer;
 import org.springframework.security.web.context.AbstractSecurityWebApplicationInitializer;
+import org.springframework.security.web.debug.DebugFilter;
 import org.springframework.security.web.firewall.HttpFirewall;
 import org.springframework.security.web.firewall.RequestRejectedHandler;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
@@ -112,86 +111,67 @@ class WebMvcSecurityConfiguration implements WebMvcConfigurer, ApplicationContex
 		}
 	}
 
-	@Bean
-	static SpringSecurityHandlerMappingIntrospectorBeanDefinitionRegistryPostProcessor springSecurityHandlerMappingIntrospectorBeanDefinitionRegistryPostProcessor() {
-		return new SpringSecurityHandlerMappingIntrospectorBeanDefinitionRegistryPostProcessor();
-	}
-
 	/**
-	 * Used to ensure Spring MVC request matching is cached. Creates a
-	 * {@link BeanDefinitionRegistryPostProcessor} that detects if a bean named
+	 * Used to ensure Spring MVC request matching is cached.
+	 *
+	 * Creates a {@link BeanDefinitionRegistryPostProcessor} that detects if a bean named
 	 * HANDLER_MAPPING_INTROSPECTOR_BEAN_NAME is defined. If so, it moves the
 	 * AbstractSecurityWebApplicationInitializer.DEFAULT_FILTER_NAME to another bean name
 	 * and then adds a {@link CompositeFilter} that contains
 	 * {@link HandlerMappingIntrospector#createCacheFilter()} and the original
 	 * FilterChainProxy under the original Bean name.
-	 *
 	 * @return
 	 */
-	static class SpringSecurityHandlerMappingIntrospectorBeanDefinitionRegistryPostProcessor
-			implements BeanDefinitionRegistryPostProcessor {
-
-		@Override
-		public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
-			if (!registry.containsBeanDefinition(HANDLER_MAPPING_INTROSPECTOR_BEAN_NAME)) {
-				return;
+	@Bean
+	static BeanDefinitionRegistryPostProcessor springSecurityHandlerMappingIntrospectorBeanDefinitionRegistryPostProcessor() {
+		return new BeanDefinitionRegistryPostProcessor() {
+			@Override
+			public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
 			}
 
-			BeanDefinition hmiRequestTransformer = BeanDefinitionBuilder
-				.rootBeanDefinition(HandlerMappingIntrospectorRequestTransformer.class)
-				.addConstructorArgReference(HANDLER_MAPPING_INTROSPECTOR_BEAN_NAME)
-				.getBeanDefinition();
-			registry.registerBeanDefinition(HANDLER_MAPPING_INTROSPECTOR_BEAN_NAME + "RequestTransformer",
-					hmiRequestTransformer);
+			@Override
+			public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) throws BeansException {
+				if (!registry.containsBeanDefinition(HANDLER_MAPPING_INTROSPECTOR_BEAN_NAME)) {
+					return;
+				}
 
-			BeanDefinition filterChainProxy = registry
-				.getBeanDefinition(AbstractSecurityWebApplicationInitializer.DEFAULT_FILTER_NAME);
+				String hmiRequestTransformerBeanName = HANDLER_MAPPING_INTROSPECTOR_BEAN_NAME + "RequestTransformer";
+				if (!registry.containsBeanDefinition(hmiRequestTransformerBeanName)) {
+					BeanDefinition hmiRequestTransformer = BeanDefinitionBuilder
+						.rootBeanDefinition(HandlerMappingIntrospectorRequestTransformer.class)
+						.addConstructorArgReference(HANDLER_MAPPING_INTROSPECTOR_BEAN_NAME)
+						.getBeanDefinition();
+					registry.registerBeanDefinition(hmiRequestTransformerBeanName, hmiRequestTransformer);
+				}
 
-			BeanDefinitionBuilder hmiCacheFilterBldr = BeanDefinitionBuilder
-				.rootBeanDefinition(HandlerMappingIntrospectorCachFilterFactoryBean.class)
-				.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+				BeanDefinition filterChainProxy = registry
+					.getBeanDefinition(AbstractSecurityWebApplicationInitializer.DEFAULT_FILTER_NAME);
 
-			ManagedList<BeanMetadataElement> filters = new ManagedList<>();
-			filters.add(hmiCacheFilterBldr.getBeanDefinition());
-			filters.add(filterChainProxy);
-			BeanDefinitionBuilder compositeSpringSecurityFilterChainBldr = BeanDefinitionBuilder
-				.rootBeanDefinition(CompositeFilterChainProxy.class)
-				.addConstructorArgValue(filters);
+				if (!filterChainProxy.getResolvableType().isInstance(CompositeFilterChainProxy.class)) {
+					BeanDefinitionBuilder hmiCacheFilterBldr = BeanDefinitionBuilder
+						.rootBeanDefinition(HandlerMappingIntrospectorCacheFilterFactoryBean.class)
+						.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
 
-			registry.removeBeanDefinition(AbstractSecurityWebApplicationInitializer.DEFAULT_FILTER_NAME);
-			registry.registerBeanDefinition(AbstractSecurityWebApplicationInitializer.DEFAULT_FILTER_NAME,
-					compositeSpringSecurityFilterChainBldr.getBeanDefinition());
-		}
+					ManagedList<BeanMetadataElement> filters = new ManagedList<>();
+					filters.add(hmiCacheFilterBldr.getBeanDefinition());
+					filters.add(filterChainProxy);
+					BeanDefinitionBuilder compositeSpringSecurityFilterChainBldr = BeanDefinitionBuilder
+						.rootBeanDefinition(CompositeFilterChainProxy.class)
+						.addConstructorArgValue(filters);
 
-		@Override
-		public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
-
-		}
-
-	}
-
-	/**
-	 * Used to exclude the
-	 * {@link SpringSecurityHandlerMappingIntrospectorBeanDefinitionRegistryPostProcessor}
-	 * from AOT processing. See <a href=
-	 * "https://github.com/spring-projects/spring-security/issues/14362">gh-14362</a>
-	 */
-	static class SpringSecurityHandlerMappingIntrospectorBeanRegistrationExcludeFilter
-			implements BeanRegistrationExcludeFilter {
-
-		@Override
-		public boolean isExcludedFromAotProcessing(RegisteredBean registeredBean) {
-			Class<?> beanClass = registeredBean.getBeanClass();
-			return SpringSecurityHandlerMappingIntrospectorBeanDefinitionRegistryPostProcessor.class == beanClass;
-		}
-
+					registry.removeBeanDefinition(AbstractSecurityWebApplicationInitializer.DEFAULT_FILTER_NAME);
+					registry.registerBeanDefinition(AbstractSecurityWebApplicationInitializer.DEFAULT_FILTER_NAME,
+							compositeSpringSecurityFilterChainBldr.getBeanDefinition());
+				}
+			}
+		};
 	}
 
 	/**
 	 * {@link FactoryBean} to defer creation of
 	 * {@link HandlerMappingIntrospector#createCacheFilter()}
 	 */
-	static class HandlerMappingIntrospectorCachFilterFactoryBean
+	static class HandlerMappingIntrospectorCacheFilterFactoryBean
 			implements ApplicationContextAware, FactoryBean<Filter> {
 
 		private ApplicationContext applicationContext;
@@ -322,6 +302,9 @@ class WebMvcSecurityConfiguration implements WebMvcConfigurer, ApplicationContex
 			for (Filter filter : filters) {
 				if (filter instanceof FilterChainProxy fcp) {
 					return fcp;
+				}
+				if (filter instanceof DebugFilter debugFilter) {
+					return debugFilter.getFilterChainProxy();
 				}
 			}
 			throw new IllegalStateException("Couldn't find FilterChainProxy in " + filters);
