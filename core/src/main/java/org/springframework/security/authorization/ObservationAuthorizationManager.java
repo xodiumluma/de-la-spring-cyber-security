@@ -21,11 +21,15 @@ import java.util.function.Supplier;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationConvention;
 import io.micrometer.observation.ObservationRegistry;
+import org.aopalliance.intercept.MethodInvocation;
 
 import org.springframework.context.MessageSource;
 import org.springframework.context.MessageSourceAware;
 import org.springframework.context.support.MessageSourceAccessor;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authorization.method.MethodAuthorizationDeniedHandler;
+import org.springframework.security.authorization.method.MethodInvocationResult;
+import org.springframework.security.authorization.method.ThrowingMethodAuthorizationDeniedHandler;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.SpringSecurityMessageSource;
 import org.springframework.util.Assert;
@@ -36,7 +40,8 @@ import org.springframework.util.Assert;
  * @author Josh Cummings
  * @since 6.0
  */
-public final class ObservationAuthorizationManager<T> implements AuthorizationManager<T>, MessageSourceAware {
+public final class ObservationAuthorizationManager<T>
+		implements AuthorizationManager<T>, MessageSourceAware, MethodAuthorizationDeniedHandler {
 
 	private final ObservationRegistry registry;
 
@@ -46,9 +51,14 @@ public final class ObservationAuthorizationManager<T> implements AuthorizationMa
 
 	private MessageSourceAccessor messages = SpringSecurityMessageSource.getAccessor();
 
+	private MethodAuthorizationDeniedHandler handler = new ThrowingMethodAuthorizationDeniedHandler();
+
 	public ObservationAuthorizationManager(ObservationRegistry registry, AuthorizationManager<T> delegate) {
 		this.registry = registry;
 		this.delegate = delegate;
+		if (delegate instanceof MethodAuthorizationDeniedHandler h) {
+			this.handler = h;
+		}
 	}
 
 	@Override
@@ -96,6 +106,17 @@ public final class ObservationAuthorizationManager<T> implements AuthorizationMa
 	@Override
 	public void setMessageSource(final MessageSource messageSource) {
 		this.messages = new MessageSourceAccessor(messageSource);
+	}
+
+	@Override
+	public Object handleDeniedInvocation(MethodInvocation methodInvocation, AuthorizationResult authorizationResult) {
+		return this.handler.handleDeniedInvocation(methodInvocation, authorizationResult);
+	}
+
+	@Override
+	public Object handleDeniedInvocationResult(MethodInvocationResult methodInvocationResult,
+			AuthorizationResult authorizationResult) {
+		return this.handler.handleDeniedInvocationResult(methodInvocationResult, authorizationResult);
 	}
 
 }

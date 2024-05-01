@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,9 +51,12 @@ import org.opensaml.saml.saml2.core.Conditions;
 import org.opensaml.saml.saml2.core.EncryptedAssertion;
 import org.opensaml.saml.saml2.core.EncryptedAttribute;
 import org.opensaml.saml.saml2.core.EncryptedID;
+import org.opensaml.saml.saml2.core.Issuer;
 import org.opensaml.saml.saml2.core.NameID;
 import org.opensaml.saml.saml2.core.OneTimeUse;
+import org.opensaml.saml.saml2.core.ProxyRestriction;
 import org.opensaml.saml.saml2.core.Response;
+import org.opensaml.saml.saml2.core.Status;
 import org.opensaml.saml.saml2.core.StatusCode;
 import org.opensaml.saml.saml2.core.SubjectConfirmation;
 import org.opensaml.saml.saml2.core.SubjectConfirmationData;
@@ -61,6 +64,9 @@ import org.opensaml.saml.saml2.core.impl.AttributeBuilder;
 import org.opensaml.saml.saml2.core.impl.EncryptedAssertionBuilder;
 import org.opensaml.saml.saml2.core.impl.EncryptedIDBuilder;
 import org.opensaml.saml.saml2.core.impl.NameIDBuilder;
+import org.opensaml.saml.saml2.core.impl.ProxyRestrictionBuilder;
+import org.opensaml.saml.saml2.core.impl.StatusBuilder;
+import org.opensaml.saml.saml2.core.impl.StatusCodeBuilder;
 import org.opensaml.xmlsec.encryption.impl.EncryptedDataBuilder;
 import org.opensaml.xmlsec.signature.support.SignatureConstants;
 import org.w3c.dom.Element;
@@ -730,6 +736,93 @@ public class OpenSaml4AuthenticationProviderTests {
 	}
 
 	@Test
+	public void authenticateWhenResponseStatusIsNotSuccessThenOnlyReturnParentStatusCodes() {
+		ResponseToken mockResponseToken = mock(ResponseToken.class);
+		Saml2AuthenticationToken mockSamlToken = mock(Saml2AuthenticationToken.class);
+		given(mockResponseToken.getToken()).willReturn(mockSamlToken);
+
+		RelyingPartyRegistration mockRelyingPartyRegistration = mock(RelyingPartyRegistration.class);
+		given(mockSamlToken.getRelyingPartyRegistration()).willReturn(mockRelyingPartyRegistration);
+
+		RelyingPartyRegistration.AssertingPartyDetails mockAssertingPartyDetails = mock(
+				RelyingPartyRegistration.AssertingPartyDetails.class);
+		given(mockRelyingPartyRegistration.getAssertingPartyDetails()).willReturn(mockAssertingPartyDetails);
+
+		Status parentStatus = new StatusBuilder().buildObject();
+		StatusCode parentStatusCode = new StatusCodeBuilder().buildObject();
+		parentStatusCode.setValue(StatusCode.AUTHN_FAILED);
+		StatusCode childStatusCode = new StatusCodeBuilder().buildObject();
+		childStatusCode.setValue(StatusCode.NO_PASSIVE);
+		parentStatusCode.setStatusCode(childStatusCode);
+		parentStatus.setStatusCode(parentStatusCode);
+
+		Response mockResponse = mock(Response.class);
+		given(mockResponse.getStatus()).willReturn(parentStatus);
+		Issuer mockIssuer = mock(Issuer.class);
+		given(mockIssuer.getValue()).willReturn("mockedIssuer");
+		given(mockResponse.getIssuer()).willReturn(mockIssuer);
+
+		given(mockResponseToken.getResponse()).willReturn(mockResponse);
+
+		Converter<ResponseToken, Saml2ResponseValidatorResult> validator = OpenSaml4AuthenticationProvider
+			.createDefaultResponseValidator();
+		Saml2ResponseValidatorResult result = validator.convert(mockResponseToken);
+
+		String expectedErrorMessage = String.format("Invalid status [%s] for SAML response",
+				parentStatusCode.getValue());
+		assertThat(
+				result.getErrors().stream().anyMatch((error) -> error.getDescription().contains(expectedErrorMessage)));
+		assertThat(result.getErrors()
+			.stream()
+			.noneMatch((error) -> error.getDescription().contains(childStatusCode.getValue())));
+	}
+
+	@Test
+	public void authenticateWhenResponseStatusIsNotSuccessThenReturnParentAndChildStatusCode() {
+		ResponseToken mockResponseToken = mock(ResponseToken.class);
+		Saml2AuthenticationToken mockSamlToken = mock(Saml2AuthenticationToken.class);
+		given(mockResponseToken.getToken()).willReturn(mockSamlToken);
+
+		RelyingPartyRegistration mockRelyingPartyRegistration = mock(RelyingPartyRegistration.class);
+		given(mockSamlToken.getRelyingPartyRegistration()).willReturn(mockRelyingPartyRegistration);
+
+		RelyingPartyRegistration.AssertingPartyDetails mockAssertingPartyDetails = mock(
+				RelyingPartyRegistration.AssertingPartyDetails.class);
+		given(mockRelyingPartyRegistration.getAssertingPartyDetails()).willReturn(mockAssertingPartyDetails);
+
+		Status parentStatus = new StatusBuilder().buildObject();
+		StatusCode parentStatusCode = new StatusCodeBuilder().buildObject();
+		parentStatusCode.setValue(StatusCode.REQUESTER);
+		StatusCode childStatusCode = new StatusCodeBuilder().buildObject();
+		childStatusCode.setValue(StatusCode.NO_PASSIVE);
+		parentStatusCode.setStatusCode(childStatusCode);
+		parentStatus.setStatusCode(parentStatusCode);
+
+		Response mockResponse = mock(Response.class);
+		given(mockResponse.getStatus()).willReturn(parentStatus);
+		Issuer mockIssuer = mock(Issuer.class);
+		given(mockIssuer.getValue()).willReturn("mockedIssuer");
+		given(mockResponse.getIssuer()).willReturn(mockIssuer);
+
+		given(mockResponseToken.getResponse()).willReturn(mockResponse);
+
+		Converter<ResponseToken, Saml2ResponseValidatorResult> validator = OpenSaml4AuthenticationProvider
+			.createDefaultResponseValidator();
+		Saml2ResponseValidatorResult result = validator.convert(mockResponseToken);
+
+		String expectedParentErrorMessage = String.format("Invalid status [%s] for SAML response",
+				parentStatusCode.getValue());
+		String expectedChildErrorMessage = String.format("Invalid status [%s] for SAML response",
+				childStatusCode.getValue());
+		assertThat(result.getErrors()
+			.stream()
+			.anyMatch((error) -> error.getDescription().contains(expectedParentErrorMessage)));
+		assertThat(result.getErrors()
+			.stream()
+			.anyMatch((error) -> error.getDescription().contains(expectedChildErrorMessage)));
+	}
+
+	@Test
 	public void authenticateWhenAssertionIssuerNotValidThenFailsWithInvalidIssuer() {
 		OpenSaml4AuthenticationProvider provider = new OpenSaml4AuthenticationProvider();
 		Response response = response();
@@ -739,6 +832,19 @@ public class OpenSaml4AuthenticationProviderTests {
 		Saml2AuthenticationToken token = token(signed(response), verifying(registration()));
 		assertThatExceptionOfType(Saml2AuthenticationException.class).isThrownBy(() -> provider.authenticate(token))
 			.withMessageContaining("did not match any valid issuers");
+	}
+
+	// gh-14931
+	@Test
+	public void authenticateWhenAssertionHasProxyRestrictionThenParses() {
+		OpenSaml4AuthenticationProvider provider = new OpenSaml4AuthenticationProvider();
+		Response response = response();
+		Assertion assertion = assertion();
+		ProxyRestriction condition = new ProxyRestrictionBuilder().buildObject();
+		assertion.getConditions().getConditions().add(condition);
+		response.getAssertions().add(assertion);
+		Saml2AuthenticationToken token = token(signed(response), verifying(registration()));
+		provider.authenticate(token);
 	}
 
 	private <T extends XMLObject> T build(QName qName) {

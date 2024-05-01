@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,14 +25,12 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.springframework.aop.Pointcut;
-import org.springframework.aop.PointcutAdvisor;
-import org.springframework.aop.framework.AopInfrastructureBean;
-import org.springframework.core.Ordered;
 import org.springframework.core.log.LogMessage;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.security.authorization.AuthorizationEventPublisher;
 import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.core.Authentication;
@@ -48,8 +46,7 @@ import org.springframework.util.Assert;
  * @author Josh Cummings
  * @since 5.6
  */
-public final class AuthorizationManagerAfterMethodInterceptor
-		implements Ordered, MethodInterceptor, PointcutAdvisor, AopInfrastructureBean {
+public final class AuthorizationManagerAfterMethodInterceptor implements AuthorizationAdvisor {
 
 	private Supplier<SecurityContextHolderStrategy> securityContextHolderStrategy = SecurityContextHolder::getContextHolderStrategy;
 
@@ -58,6 +55,8 @@ public final class AuthorizationManagerAfterMethodInterceptor
 	private final Pointcut pointcut;
 
 	private final AuthorizationManager<MethodInvocationResult> authorizationManager;
+
+	private final MethodAuthorizationDeniedHandler defaultHandler = new ThrowingMethodAuthorizationDeniedHandler();
 
 	private int order;
 
@@ -93,7 +92,7 @@ public final class AuthorizationManagerAfterMethodInterceptor
 			PostAuthorizeAuthorizationManager authorizationManager) {
 		AuthorizationManagerAfterMethodInterceptor interceptor = new AuthorizationManagerAfterMethodInterceptor(
 				AuthorizationMethodPointcuts.forAnnotations(PostAuthorize.class), authorizationManager);
-		interceptor.setOrder(500);
+		interceptor.setOrder(AuthorizationInterceptorsOrder.POST_AUTHORIZE.getOrder());
 		return interceptor;
 	}
 
@@ -107,7 +106,7 @@ public final class AuthorizationManagerAfterMethodInterceptor
 			AuthorizationManager<MethodInvocationResult> authorizationManager) {
 		AuthorizationManagerAfterMethodInterceptor interceptor = new AuthorizationManagerAfterMethodInterceptor(
 				AuthorizationMethodPointcuts.forAnnotations(PostAuthorize.class), authorizationManager);
-		interceptor.setOrder(500);
+		interceptor.setOrder(AuthorizationInterceptorsOrder.POST_AUTHORIZE.getOrder());
 		return interceptor;
 	}
 
@@ -119,9 +118,17 @@ public final class AuthorizationManagerAfterMethodInterceptor
 	 */
 	@Override
 	public Object invoke(MethodInvocation mi) throws Throwable {
-		Object result = mi.proceed();
-		attemptAuthorization(mi, result);
-		return result;
+		Object result;
+		try {
+			result = mi.proceed();
+		}
+		catch (AuthorizationDeniedException ex) {
+			if (this.authorizationManager instanceof MethodAuthorizationDeniedHandler handler) {
+				return handler.handleDeniedInvocation(mi, ex);
+			}
+			return this.defaultHandler.handleDeniedInvocation(mi, ex);
+		}
+		return attemptAuthorization(mi, result);
 	}
 
 	@Override
@@ -172,7 +179,7 @@ public final class AuthorizationManagerAfterMethodInterceptor
 		this.securityContextHolderStrategy = () -> strategy;
 	}
 
-	private void attemptAuthorization(MethodInvocation mi, Object result) {
+	private Object attemptAuthorization(MethodInvocation mi, Object result) {
 		this.logger.debug(LogMessage.of(() -> "Authorizing method invocation " + mi));
 		MethodInvocationResult object = new MethodInvocationResult(mi, result);
 		AuthorizationDecision decision = this.authorizationManager.check(this::getAuthentication, object);
@@ -180,9 +187,17 @@ public final class AuthorizationManagerAfterMethodInterceptor
 		if (decision != null && !decision.isGranted()) {
 			this.logger.debug(LogMessage.of(() -> "Failed to authorize " + mi + " with authorization manager "
 					+ this.authorizationManager + " and decision " + decision));
-			throw new AccessDeniedException("Access Denied");
+			return handlePostInvocationDenied(object, decision);
 		}
 		this.logger.debug(LogMessage.of(() -> "Authorized method invocation " + mi));
+		return result;
+	}
+
+	private Object handlePostInvocationDenied(MethodInvocationResult mi, AuthorizationDecision decision) {
+		if (this.authorizationManager instanceof MethodAuthorizationDeniedHandler deniedHandler) {
+			return deniedHandler.handleDeniedInvocationResult(mi, decision);
+		}
+		return this.defaultHandler.handleDeniedInvocationResult(mi, decision);
 	}
 
 	private Authentication getAuthentication() {
