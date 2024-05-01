@@ -79,7 +79,7 @@ See https://github.com/spring-projects/spring-security/tree/main#building-from-s
 
 The wiki pages https://github.com/spring-projects/spring-framework/wiki/Code-Style[Code Style] and https://github.com/spring-projects/spring-framework/wiki/IntelliJ-IDEA-Editor-Settings[IntelliJ IDEA Editor Settings] define the source file coding standards we use along with some IDEA editor settings we customize.
 
-To format the code as well as check the style, run `./gradle format check`.
+To format the code as well as check the style, run `./gradlew format check`.
 
 [[submit-a-pull-request]]
 === Submit a Pull Request
@@ -105,7 +105,7 @@ Once merged, the fix will be forwarded-ported to applicable branches including `
 1. Create a local branch
 If this is for an issue, consider a branch name with the issue number, like `gh-22276`.
 [[write-tests]]
-1. Add JUnit Tests for your changes
+1. Add documentation and JUnit Tests for your changes.
 [[update-copyright]]
 1. In all files you edited, if the copyright header is of the form 2002-20xx, update the final copyright year to the current year.
 [[add-since]]

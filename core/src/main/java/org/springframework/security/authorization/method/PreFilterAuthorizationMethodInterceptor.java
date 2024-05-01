@@ -23,9 +23,6 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 
 import org.springframework.aop.Pointcut;
-import org.springframework.aop.PointcutAdvisor;
-import org.springframework.aop.framework.AopInfrastructureBean;
-import org.springframework.core.Ordered;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.access.prepost.PreFilter;
@@ -44,8 +41,7 @@ import org.springframework.util.StringUtils;
  * @author Josh Cummings
  * @since 5.6
  */
-public final class PreFilterAuthorizationMethodInterceptor
-		implements Ordered, MethodInterceptor, PointcutAdvisor, AopInfrastructureBean {
+public final class PreFilterAuthorizationMethodInterceptor implements AuthorizationAdvisor {
 
 	private Supplier<SecurityContextHolderStrategy> securityContextHolderStrategy = SecurityContextHolder::getContextHolderStrategy;
 
@@ -68,7 +64,19 @@ public final class PreFilterAuthorizationMethodInterceptor
 	 * @param expressionHandler the {@link MethodSecurityExpressionHandler} to use
 	 */
 	public void setExpressionHandler(MethodSecurityExpressionHandler expressionHandler) {
-		this.registry = new PreFilterExpressionAttributeRegistry(expressionHandler);
+		this.registry.setExpressionHandler(expressionHandler);
+	}
+
+	/**
+	 * Configure pre/post-authorization template resolution
+	 * <p>
+	 * By default, this value is <code>null</code>, which indicates that templates should
+	 * not be resolved.
+	 * @param defaults - whether to resolve pre/post-authorization templates parameters
+	 * @since 6.3
+	 */
+	public void setTemplateDefaults(PrePostTemplateDefaults defaults) {
+		this.registry.setTemplateDefaults(defaults);
 	}
 
 	/**
