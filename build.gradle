@@ -24,6 +24,7 @@ apply plugin: 's101'
 apply plugin: 'io.spring.convention.root'
 apply plugin: 'org.jetbrains.kotlin.jvm'
 apply plugin: 'org.springframework.security.versions.verify-dependencies-versions'
+apply plugin: 'org.springframework.security.check-expected-branch-version'
 apply plugin: 'io.spring.security.release'
 
 group = 'org.springframework.security'
@@ -42,7 +43,7 @@ springRelease {
 	weekOfMonth = 3
 	dayOfWeek = 1
 	referenceDocUrl = "https://docs.spring.io/spring-security/reference/{version}/index.html"
-	apiDocUrl = "https://docs.spring.io/spring-security/docs/{version}/api/"
+	apiDocUrl = "https://docs.spring.io/spring-security/site/docs/{version}/api/"
 	replaceSnapshotVersionInReferenceDocUrl = true
 }
 
@@ -97,10 +98,10 @@ allprojects {
 	}
 }
 
-if (hasProperty('buildScan')) {
+develocity {
 	buildScan {
-		termsOfServiceUrl = 'https://gradle.com/terms-of-service'
-		termsOfServiceAgree = 'yes'
+		termsOfUseUrl = 'https://gradle.com/help/legal-terms-of-use'
+		termsOfUseAgree = 'yes'
 	}
 }
 
@@ -125,7 +126,7 @@ wrapperUpgrade {
 	gradle {
 		'spring-security' {
 			repo = 'spring-projects/spring-security'
-			baseBranch = '6.1.x' // runs only on 6.1.x and the update is merged forward to main
+			baseBranch = '6.2.x' // runs only on 6.2.x and the update is merged forward to main
 		}
 	}
 }

@@ -39,6 +39,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * {@link PasswordEncoder} is defined will wire this up too.
  *
  * @author Rob Winch
+ * @author Ngoc Nhan
  * @since 4.1
  */
 @Order(InitializeUserDetailsBeanManagerConfigurer.DEFAULT_ORDER)
@@ -70,10 +71,11 @@ class InitializeUserDetailsBeanManagerConfigurer extends GlobalAuthenticationCon
 			if (auth.isConfigured()) {
 				if (!userDetailsServices.isEmpty()) {
 					this.logger.warn("Global AuthenticationManager configured with an AuthenticationProvider bean. "
-							+ "UserDetailsService beans will not be used for username/password login. "
+							+ "UserDetailsService beans will not be used by Spring Security for automatically configuring username/password login. "
 							+ "Consider removing the AuthenticationProvider bean. "
-							+ "Alternatively, consider using the UserDetailsService in a manually instantiated "
-							+ "DaoAuthenticationProvider.");
+							+ "Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider. "
+							+ "If the current configuration is intentional, to turn off this warning, "
+							+ "increase the logging level of 'org.springframework.security.config.annotation.authentication.configuration.InitializeUserDetailsBeanManagerConfigurer' to ERROR");
 				}
 				return;
 			}
@@ -89,8 +91,8 @@ class InitializeUserDetailsBeanManagerConfigurer extends GlobalAuthenticationCon
 						beanNames));
 				return;
 			}
-			var userDetailsService = userDetailsServices.get(0).getBean();
-			var userDetailsServiceBeanName = userDetailsServices.get(0).getName();
+			UserDetailsService userDetailsService = userDetailsServices.get(0).getBean();
+			String userDetailsServiceBeanName = userDetailsServices.get(0).getName();
 			PasswordEncoder passwordEncoder = getBeanOrNull(PasswordEncoder.class);
 			UserDetailsPasswordService passwordManager = getBeanOrNull(UserDetailsPasswordService.class);
 			CompromisedPasswordChecker passwordChecker = getBeanOrNull(CompromisedPasswordChecker.class);
@@ -120,11 +122,7 @@ class InitializeUserDetailsBeanManagerConfigurer extends GlobalAuthenticationCon
 		 * component, null otherwise.
 		 */
 		private <T> T getBeanOrNull(Class<T> type) {
-			String[] beanNames = InitializeUserDetailsBeanManagerConfigurer.this.context.getBeanNamesForType(type);
-			if (beanNames.length != 1) {
-				return null;
-			}
-			return InitializeUserDetailsBeanManagerConfigurer.this.context.getBean(beanNames[0], type);
+			return InitializeUserDetailsBeanManagerConfigurer.this.context.getBeanProvider(type).getIfUnique();
 		}
 
 		/**
@@ -135,7 +133,7 @@ class InitializeUserDetailsBeanManagerConfigurer extends GlobalAuthenticationCon
 			List<BeanWithName<T>> beanWithNames = new ArrayList<>();
 			String[] beanNames = InitializeUserDetailsBeanManagerConfigurer.this.context.getBeanNamesForType(type);
 			for (String beanName : beanNames) {
-				T bean = InitializeUserDetailsBeanManagerConfigurer.this.context.getBean(beanNames[0], type);
+				T bean = InitializeUserDetailsBeanManagerConfigurer.this.context.getBean(beanName, type);
 				beanWithNames.add(new BeanWithName<T>(bean, beanName));
 			}
 			return beanWithNames;
